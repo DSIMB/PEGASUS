@@ -92,12 +92,12 @@
 2. **Run the Docker Container**
 
    ```bash
-   docker run --gpus all -v /path/to/input:/input -v /path/to/output:/output -v /path/to/models:/models dsimb/pegasus -i /input/sequences.fasta --output_dir /output --models_dir /models
+   docker run -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) --gpus all -v /path/to/input:/input -v /path/to/output:/output -v /path/to/models:/models dsimb/pegasus -i /input/sequences.fasta --output_dir /output --models_dir /models
    ```
 
    - Replace `/path/to/input`, `/path/to/output`, and `/path/to/models` with your local directories.
    - The `--gpus all` flag enables GPU support. Omit it if you wish to run on CPU.
-   - Add `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)` to docker command if you are running docker with `sudo`, it will generate the results owned by you, not root user.
+   - The `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)` flags will generate the results owned by you, not root user when running docker with `sudo`.
 
 > [!NOTE]  
 > If cuda device is not detected in the docker container, try adding `--privileged` to the `docker run` command
