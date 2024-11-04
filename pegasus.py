@@ -840,7 +840,7 @@ def main():
 
         output_html_dir = os.path.join(unique_output_dir, 'result_pages')
         result_page_generator.generate_result_pages(
-            results_dict, modified_fasta_path, output_html_dir, predictions_dir=RESULT_PATH)
+            results_dict, modified_fasta_path, id_mapping, output_html_dir, predictions_dir=RESULT_PATH)
         # Generate the results overview page
         generate_results_overview_page(
             labels=labels,
