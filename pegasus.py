@@ -116,6 +116,12 @@ def parse_arguments():
         help="Random seed for reproducibility."
     )
     parser.add_argument(
+        "--toks_per_batch",
+        type=int,
+        default=2048,
+        help="Tokens per batch to use during embedding generation. Default is 3074."
+    )
+    parser.add_argument(
         "--generate_html",
         action='store_true',
         help="Generate result web pages for each protein."
@@ -761,8 +767,8 @@ def main():
 
     # Constants and configurations
     global SEQ_LENGTH_THRESHOLD
-    SEQ_LENGTH_THRESHOLD = 3072 + 2
-    toks_per_batch = 3072 + 2
+    SEQ_LENGTH_THRESHOLD = args.toks_per_batch
+    toks_per_batch = args.toks_per_batch
 
     # Output directories
     OUTPUT_EMBEDDINGS = os.path.join(unique_output_dir, 'embeddings')
