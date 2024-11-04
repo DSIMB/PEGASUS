@@ -21,8 +21,8 @@ ENV PATH="/opt/conda/envs/pegasus/bin:$PATH"
 ENV LD_LIBRARY_PATH="/opt/conda/envs/pegasus/lib:$LD_LIBRARY_PATH"
 
 # Copy the PEGASUS scripts
-COPY scripts/pegasus.py .
-COPY scripts/result_page_generator.py .
+COPY pegasus.py .
+COPY result_page_generator.py .
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN echo "conda activate pegasus" >> ~/.bashrc

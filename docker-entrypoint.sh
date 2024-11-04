@@ -19,4 +19,4 @@ fi
 chown -R pegasususer:pegasusgroup /app /models /output
 
 # Execute the main application as the new user
-exec gosu pegasususer python pegasus_standalone.py "$@"
+exec gosu pegasususer python pegasus.py "$@"
