@@ -290,10 +290,10 @@ def load_model_and_tokenizer(name: str, device, models_dir: str):
         model = T5EncoderModel.from_pretrained('Rostlab/prot_t5_xl_uniref50', cache_dir=models_dir).to(device).eval()
         tokenizer = T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_uniref50', do_lower_case=False, cache_dir=models_dir)
     elif name == 'esm2_t36_3B_UR50D':
-        model_path = os.path.join(models_dir, 'esm2_t36_3B_UR50D.pt')
-        tokenizer_path = os.path.join(models_dir, 'esm2_t36_3B_UR50D_tokenizer.pt')
+        model_path = os.path.join(models_dir, f'{name}.pt')
+        tokenizer_path = os.path.join(models_dir, f'{name}_tokenizer.pt')
         if os.path.exists(model_path) and os.path.exists(tokenizer_path):
-            model = torch.load(model_path, map_location=device)
+            model = torch.load(model_path)
             alphabet = torch.load(tokenizer_path)
             tokenizer = alphabet.get_batch_converter()
             model = model.to(device).eval()
