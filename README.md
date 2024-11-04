@@ -1,7 +1,9 @@
-# PEGASUS: Protein Embedding and Generative Analysis Script Using Sequences
+
+<p align="center">
+    <img src="https://github.com/user-attachments/assets/d8c62317-d82a-403a-b5da-7128c69225c7" alt="logo" width="400">
+</p>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
 
 ## Table of Contents
 
@@ -23,7 +25,7 @@
 
 ## Introduction
 
-**PEGASUS** (Protein Embedding and Generative Analysis Script Using Sequences) is a comprehensive tool designed for protein sequence analysis. It generates embeddings using pre-trained models, predicts various structural and functional metrics, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA file as input and allows users to specify the computation device (CPU or GPU).
+**PEGASUS** is a comprehensive tool designed for protein sequence analysis. It generates embeddings using pre-trained models, predicts various structural and functional metrics, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA file as input and allows users to specify the computation device (CPU or GPU).
 
 
 ## Features
@@ -54,6 +56,7 @@
 - **Conda**: Package and environment management
 - **Docker**: For containerized execution (optional)
 
+
 ### Conda Installation
 
 1. **Clone the Repository**
@@ -73,12 +76,15 @@
 
 ### Docker Installation
 
+1) Install [NVIDIA Container Toolkit for GPU](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) support.
+2) Setup running [Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+
 1. **Build or download the Docker Image**
 
    ```bash
    docker pull dsimb/pegasus
    ```
-
+   or download the bre-built latest docker image:
    ```bash
    docker build -t dsimb/pegasus .
    ```
@@ -86,16 +92,22 @@
 2. **Run the Docker Container**
 
    ```bash
-   docker run --gpus all -v /path/to/input:/input -v /path/to/output:/output -v /path/to/models:/models dsimb/pegasus -i ./input/sequences.fasta --output_dir ./output --models_dir ./models
+   docker run --gpus all -v /path/to/input:/input -v /path/to/output:/output -v /path/to/models:/models dsimb/pegasus -i /input/sequences.fasta --output_dir /output --models_dir /models
    ```
 
    - Replace `/path/to/input`, `/path/to/output`, and `/path/to/models` with your local directories.
    - The `--gpus all` flag enables GPU support. Omit it if you wish to run on CPU.
+   - Add `-e USER_ID=$(id -u) -e GROUP_ID=$(id -g)` to docker command if you are running docker with `sudo`, it will generate the results owned by you, not root user.
 
+> [!NOTE]  
+> If cuda device is not detected in the docker container, try adding `--privileged` to the `docker run` command
 
 ## Usage
 
 PEGASUS can be run via the command line. Below are the available command-line arguments and usage examples.
+
+> [!WARNING]  
+> Running all models on GPU requires at least 25 Gb GPU memory.
 
 ### Command-Line Arguments
 
@@ -185,4 +197,4 @@ If you use PEGASUS in your research, please cite:
 
 ## Contact
 
-For questions, feedback, or issues, please open an issue on the [GitHub repository](https://github.com/yourusername/pegasus/issues)
+For questions, feedback, or issues, please open an issue on the [GitHub repository](https://github.com/DSIMB/PEGASUS/issues)
