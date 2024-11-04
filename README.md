@@ -18,7 +18,6 @@
 - [Models](#models)
 - [License](#license)
 - [Citation](#citation)
-- [Acknowledgments](#acknowledgments)
 - [Contact](#contact)
 
 
