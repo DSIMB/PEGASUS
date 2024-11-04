@@ -38,6 +38,9 @@ VOLUME /models
 ENV MODELS_DIR="/models"
 ENV OUTPUT_DIR="/output"
 
+# Change ownership of the /app directory to root initially
+RUN chown -R root:root /app
+
 # Switch back to root to allow the entrypoint script to manage user creation
 USER root
 
