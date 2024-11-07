@@ -7,7 +7,6 @@ makes predictions for various metrics, and optionally generates result web pages
 for each protein. It accepts a FASTA file as input and allows the user to specify
 the computation device (CPU or GPU).
 """
-
 import argparse
 import logging
 import os
@@ -16,6 +15,7 @@ import sys
 import time
 import warnings
 import uuid
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -125,6 +125,11 @@ def parse_arguments():
         "--generate_html",
         action='store_true',
         help="Generate result web pages for each protein."
+    )
+    parser.add_argument(
+        "--keep_embeddings",
+        action='store_true',
+        help="Keep the LLM raw embeddings in OUTPUT_EMBEDDINGS directory after being used. By default, the directory is deleted after being used."
     )
     return parser.parse_args()
 
@@ -425,18 +430,14 @@ def get_embeddings(seqs, labels, models_list, toks_per_batch, output_embeddings_
         model_device_map (dict): Mapping of model names to devices.
         models_dir (str): Directory containing the pre-trained models.
     """
-    # Load models
-    loaded_models = {}
+    # For each model, generate embeddings
     for model_name in models_list:
+        # Load model
         device_choice = model_device_map.get(model_name, default_device)
         device = torch.device("cuda" if device_choice == 'gpu' and torch.cuda.is_available() else "cpu")
         logging.info(f"Loading model and tokenizer for {model_name} on device {device}...")
         model, tokenizer = load_model_and_tokenizer(model_name, device, models_dir)
-        loaded_models[model_name] = (model, tokenizer, device)
-
-    # For each model, generate embeddings
-    for model_name in models_list:
-        model, tokenizer, device = loaded_models[model_name]
+        
         logging.info(f"Generating embeddings using {model_name} on device {device}...")
         if model_name in ['ankh_base', 'ankh_large']:
             embeddings = embed_ankh(seqs, tokenizer, model, device, toks_per_batch)
@@ -459,6 +460,11 @@ def get_embeddings(seqs, labels, models_list, toks_per_batch, output_embeddings_
             }
             output_file = os.path.join(output_dir, f"{label}.pt")
             torch.save(result, output_file)
+
+        # Unload model and tokenizer to free up memory
+        del model
+        del tokenizer
+        torch.cuda.empty_cache()
 
 
 class CONV_3L(nn.Module):
@@ -684,6 +690,12 @@ def predict_metrics_for_proteins(protein_ids, available_X, available_metrics, mo
         df = pd.DataFrame(all_predictions)
         df.to_csv(os.path.join(RESULT_PATH, f'{pdb_id}_all_predictions.tsv'), sep='\t')
 
+    # Clear model cache and free up GPU memory
+    for model in model_cache.values():
+        del model
+    model_cache.clear()
+    torch.cuda.empty_cache()
+
     return results_dict, processed_protein_ids
 
 def format_duration(seconds):
@@ -853,10 +865,17 @@ def main():
         )
         logging.info("Result web pages generated.")
 
+    # Delete embeddings directory if not keeping embeddings
+    if not args.keep_embeddings:
+        logging.info("Deleting embeddings directory as per default setting.")
+        shutil.rmtree(OUTPUT_EMBEDDINGS)
+        
+    # Delete results.pkl
+    os.unlink(os.path.join(RESULT_PATH, 'results.pkl'))
+
     end_time = time.time()
     logging.info(f"Total runtime: {int(end_time - start_time)} seconds")
     logging.info(f"Results saved in: {unique_output_dir}")
-
 
 if __name__ == '__main__':
     main()
