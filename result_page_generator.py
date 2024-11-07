@@ -35,21 +35,6 @@ AA_1TOFULL = {
 }
 
 
-def load_result(filename):
-    """
-    Load results from a pickle file.
-
-    Args:
-        filename (str): Path to the results file (pickle encoded).
-
-    Returns:
-        dict: The results as a dictionary of dictionaries.
-    """
-    with open(filename, 'rb') as fp:
-        result_dict = pickle.load(fp)
-    return result_dict
-
-
 def load_tsv(protein_id, predictions_dir='predictions'):
     """
     Load TSV file with per-embedding predictions for a given protein.
@@ -921,7 +906,7 @@ def generate_result_pages(result_dict, fasta_file, id_mapping, output_dir='resul
         write_result_page(result_dict, protein_realname, protein_id, output_dir, sequence)
 
 
-def write_results_overview_page(job_id, job_duration, date, headers, sequences, protein_ids, results_dict, output_dir):
+def write_results_overview_page(job_id, job_duration, date, headers, sequences, protein_ids, results_dict, output_dir, aligned_fasta):
     """
     Generate the results overview HTML page with comparison functionality.
     """
@@ -938,11 +923,21 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
         seq_length = len(sequence)
         table_rows += f'''
             <tr>
+                <td class="details-control" style="width: 2%; cursor:pointer;">
+                    <span class="me-2">
+                        <!-- Arrow icon -->
+                        <svg class="collapse-icon bi bi-caret-right-fill" width="1em" height="1em" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 16 16">
+                            <path d="M12 8L6 12V4l6 4z"/>
+                        </svg>
+                    </span>
+                </td>
                 <td class="text-center" style="width: 3%;">
                     <input type="checkbox" class="protein-checkbox" data-length="{seq_length}" data-unique-id="{prot_id}" value="{prot_id}">
                 </td>
                 <td class="td-ellipsis"><strong>{prot_id}</strong> - {header}</td>
                 <td class="text-center" style="width: 8%;">{seq_length}</td>
+                <td>{sequence}</td> <!-- Hidden column -->
                 <td class="text-center" style="width: 3%;">
                     <a class="btn" role="button" href="../predictions/{prot_id}_all_predictions.tsv" download="{prot_id}_all_predictions.tsv">
                         <!-- Download icon -->
@@ -1025,22 +1020,24 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
         <div class="container mt-4 pt-4">
             <h2 class="search-title mb-4">Queries</h2>
 
-            <!-- Compare Button -->
-            <div class="mb-3">
+            <!-- Compare Button and Informational Text -->
+            <span class="d-inline-block mb-3" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="right" data-bs-title="Select at least two proteins of the same length to compare.">
                 <button id="compareButton" class="btn btn-success" disabled>
                     Compare Selected Proteins
                 </button>
-            </div>
+            </span>
 
             <div id="queries_table_container">
                 <table id="queries_table" class="table align-middle table-hover">
                     <thead>
                         <tr>
+                            <th></th> <!-- Expand/Collapse control column -->
                             <th>
                                 <input type="checkbox" id="select-all"/>
                             </th>
                             <th>Name</th>
                             <th>Length</th>
+                            <th>Sequence</th> <!-- Hidden column -->
                             <th>Download</th>
                             <th>Result page</th>
                         </tr>
@@ -1066,6 +1063,14 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JS -->
     <script>
+        // Initialize all tooltips on the page
+        document.addEventListener('DOMContentLoaded', function () {{
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {{
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            }});
+        }});
+    
         // JavaScript code to handle table interactions and comparison functionality
 
         // Load results.json
@@ -1086,13 +1091,56 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                     'info': true,
                     'responsive': true,
                     'columnDefs': [
-                        {{ 'orderable': false, 'targets': [0,3,4] }}, // Disable ordering on certain columns
+                        {{ 'orderable': false, 'targets': [0,1,5,6] }}, // Disable ordering on certain columns
+                        {{ 'visible': false, 'targets': 4 }}, // Hide the sequence column
                     ]
                 }});
 
                 var compareButton = $("#compareButton");
                 let selectedProteins = [];
                 let selectedLength = null;
+                
+                // Custom search function to filter by length
+                $.fn.dataTable.ext.search.push(
+                    function(settings, data, dataIndex) {{
+                        if (selectedLength === null) {{
+                            return true;
+                        }}
+                        var length = parseInt(data[3]) || 0; // Column index for Length
+                        if (length === selectedLength) {{
+                            return true;
+                        }}
+                        return false;
+                    }}
+                );
+                
+                // Add event listener for opening and closing details
+                $('#queries_table tbody').on('click', 'td.details-control', function () {{
+                    var tr = $(this).closest('tr');
+                    var row = table.row( tr );
+                    
+                    if ( row.child.isShown() ) {{
+                        // This row is already open - close it
+                        row.child.hide();
+                        tr.removeClass('shown');
+                        $(this).find('.collapse-icon').removeClass('rotate-icon');
+                    }}
+                    else {{
+                        // Open this row
+                        row.child( format(row.data()) ).show();
+                        tr.addClass('shown');
+                        $(this).find('.collapse-icon').addClass('rotate-icon');
+                    }}
+                }});
+
+                function format ( d ) {{
+                    // `d` is the original data array for the row
+                    var sequence = d[4]; // The hidden sequence column
+                    return '<div class="card card-body">'+
+                            '<strong>Sequence:</strong>'+
+                            '<p class="text-break font-monospace">'+sequence+'</p>'+
+                            '</div>';
+                }}
 
                 // Handle click on "select all" control
                 $('#select-all').on('click', function(){{
@@ -1117,12 +1165,13 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                         const allSameLength = selectedProteins.every(p => p.length === firstLength);
                         if(allSameLength){{
                             selectedLength = firstLength;
+                            table.draw();
                             if(selectedProteins.length >=2){{
                                 compareButton.prop("disabled", false);
                             }} else {{
                                 compareButton.prop("disabled", true);
-                            }}}}
-                        else {{
+                            }}
+                        }} else {{
                             compareButton.prop("disabled", true);
                             alert("Selected proteins must have the same length for comparison.");
                             // Uncheck the last checkbox
@@ -1139,12 +1188,19 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                             }} else {{
                                 selectedLength = selectedProteins[0].length;
                             }}
+                            table.draw();
                         }}
                     }} else {{
                         selectedLength = null;
                         compareButton.prop("disabled", true);
-                        // Remove existing comparison plot
-                        $("#comparison_section").empty();
+                        table.draw();
+                    }}
+
+                    // Remove Comparison Section When No Checkboxes are Checked
+                    if(selectedProteins.length === 0){{
+                        if($("#comparison_section").length){{
+                            $("#comparison_section").empty(); // Clears the contents without removing the div
+                        }}
                     }}
                 }});
 
@@ -1252,12 +1308,6 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                 var updateVisible = [];
                 var updateShowLegend = [];
 
-                var yAxisTitles = {{
-                    'RMSF': '<b>Pred. RMSF (Å)</b>',
-                    'PHI': '<b>Pred. Std. Phi (°)</b>',
-                    'PSI': '<b>Pred. Std. Psi (°)</b>',
-                    'LDDT': '<b>Pred. Mean LDDT</b>'
-                }};
 
                 for (var i = 0; i < data.length; i++) {{
                     if(data[i].name.toLowerCase().includes(metric.toLowerCase())){{
@@ -1274,6 +1324,13 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                     'visible': updateVisible,
                     'showlegend': updateShowLegend
                 }});
+                
+                var yAxisTitles = {{
+                    'RMSF': '<b>Pred. RMSF (Å)</b>',
+                    'PHI': '<b>Pred. Std. Phi (°)</b>',
+                    'PSI': '<b>Pred. Std. Psi (°)</b>',
+                    'LDDT': '<b>Pred. Mean LDDT</b>'
+                }};
 
                 // Update the y-axis title
                 Plotly.relayout('comparison_plot', {{
