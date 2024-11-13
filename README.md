@@ -17,6 +17,7 @@
   - [Command-Line Arguments](#command-line-arguments)
   - [Examples](#examples)
 - [Output Structure](#output-structure)
+  - [Viewing HTML Result Pages](#viewing-html-result-pages)
 - [Models](#models)
 - [License](#license)
 - [Citation](#citation)
@@ -25,7 +26,7 @@
 
 ## Introduction
 
-**PEGASUS** is a comprehensive tool designed for protein sequence analysis. It generates embeddings using pre-trained models, predicts various structural and functional metrics, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA file as input and allows users to specify the computation device (CPU or GPU).
+**PEGASUS** is a sequence-based predictor of MD-derived information on protein flexibility. It generates embeddings using pre-trained models, predicts residue-wise real values of backbone fluctuation (RMSF), Phi & Psi dihedral angles standard deviation, and average Local Distance Difference Test (Mean LDDT) across the trajectory, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA (optionnaly aligned) file as input and allows users to specify the computation device (CPU or GPU).
 
 
 ## Features
@@ -40,7 +41,9 @@
   - Standard Deviation of Phi Angles (**Std. Phi**)
   - Standard Deviation of Psi Angles (**Std. Psi**)
   - Mean Local Distance Difference Test (**Mean LDDT**)
-- **Interactive Results**: Optionally generates interactive HTML pages for visualization for the same user experience as with the webserver.
+- **Interactive Results**: Optionally generates interactive HTML pages for visualization, including a comprehensive results overview page with comparison functionality.
+- **Aligned Sequence Support**: Supports aligned protein sequences as input, enabling the analysis of multiple sequence alignments.
+- **HTTP Server**: Optionally starts an HTTP server to serve the result pages, making it easy to view results in a web browser.
 - **Flexible Computation**: Supports CPU and GPU devices, with customizable device allocation for each model.
 - **Reproducibility**: Allows setting a random seed for consistent results.
 - **Docker Support**: Provides a Dockerfile for containerized execution.
@@ -114,24 +117,30 @@ Download and extract Pegasus weights in the `models` directory.
 PEGASUS can be run via the command line. Below are the available command-line arguments and usage examples.
 
 > [!WARNING]  
-> Running all models on GPU requires at least 25 Gb GPU memory.
+> Models are loaded on the selected device sequentially and purged, so the maximum memory required to run Pegasus corresponds to the largest model size, which is ESM2 with 11 Gb.
 
 ### Command-Line Arguments
 
 ```plaintext
-usage: pegasus.py [-h] -i INPUT_FASTA [-d {cpu,gpu}] [--models_dir MODELS_DIR]
-                  [--output_dir OUTPUT_DIR]
+usage: pegasus.py [-h] -i INPUT_FASTA [-d {cpu,gpu}] [-m MODELS_DIR] [-o OUTPUT_DIR]
                   [--model_device_map MODEL_DEVICE_MAP [MODEL_DEVICE_MAP ...]]
-                  [--seed SEED] [--generate_html]
+                  [-s SEED] [-t TOKS_PER_BATCH] [-g] [-k] [-a] [--serve] [--host HOST] [--port PORT]
 ```
 
 - `-i`, `--input_fasta`: **(Required)** Path to the input (multi)FASTA file containing protein sequences.
 - `-d`, `--default_device`: Default computation device (`cpu` or `gpu`). Default is `cpu`.
-- `--models_dir`: Directory containing pre-trained models. Default is the environment variable `MODELS_DIR` or `models`.
-- `--output_dir`: Directory to save output files. Default is the environment variable `OUTPUT_DIR` or `output`.
+- `-m`, `--models_dir`: Directory containing pre-trained models. Default is the environment variable `MODELS_DIR` or `models`.
+- `-o`, `--output_dir`: Directory to save output files. Default is the environment variable `OUTPUT_DIR` or `output`.
 - `--model_device_map`: Specify device for each model in the format `model_name:device` (e.g., `prot_t5_xl_uniref50:gpu`). Accepted models are `ankh_base`, `ankh_large`, `prot_t5_xl_uniref50`, `esm2_t36_3B_UR50D`, `pegasus`.
-- `--seed`: Random seed for reproducibility. Default is `42`.
-- `--generate_html`: Include this flag to generate result web pages for each protein as well as an overview page.
+- `-s`, `--seed`: Random seed for reproducibility. Default is `42`.
+-	`-t`, `--toks_per_batch`: Maximum tokens per batch to use during embedding generation. Default is 2048.
+- `-g`, `--generate_html`: Include this flag to generate result web pages for each protein as well as an overview page.
+- `-k`, `--keep_embeddings`: Keep the LLMs raw embeddings in OUTPUT_EMBEDDINGS directory after being used. By default, the directory is deleted after being used.
+- `-a`, `--aligned_fasta`:   Input protein sequences are aligned or not
+- `--serve`: Start an HTTP server at the end to serve the result pages.
+- `--host `: Hostname to use when serving the result pages. Default is "localhost".
+- `--port`: Port to use when serving the result pages. Default is 8000.
+
 
 ### Examples
 
@@ -152,20 +161,33 @@ usage: pegasus.py [-h] -i INPUT_FASTA [-d {cpu,gpu}] [--models_dir MODELS_DIR]
 3. **Specify Devices for Specific Models**
 
    ```bash
-   python pegasus.py -i sequences.fasta --model_device_map ankh_base:cpu prot_t5_xl_uniref50:gpu
+   python pegasus.py -i sequences.fasta -d gpu --model_device_map esm2_t36_3B_UR50D:cpu prot_t5_xl_uniref50:cpu
    ```
 
-4. **Generate Interactive HTML Result Pages**
+4. **Specify that input protein sequences (multifasta) are aligned**
+
+   ```bash
+   python pegasus.py -i sequences.fasta --aligned_fasta
+   ```
+
+5. **Generate Interactive HTML Result Pages**
 
    ```bash
    python pegasus.py -i sequences.fasta --generate_html
    ```
 
-5. **Full Command with Custom Output and Models Directory**
+6. **Full Command with Custom Output and Models Directory**
 
    ```bash
    python pegasus.py -i sequences.fasta --output_dir /path/to/output --models_dir /path/to/models --generate_html
    ```
+
+7. **Full Command with Custom Output and Models Directory and serve the result pages**
+
+   ```bash
+   python pegasus.py -i sequences.fasta --output_dir /path/to/output --models_dir /path/to/models --generate_html --serve
+   ```
+
 
 
 ## Output Structure
@@ -173,16 +195,20 @@ usage: pegasus.py [-h] -i INPUT_FASTA [-d {cpu,gpu}] [--models_dir MODELS_DIR]
 After running PEGASUS, a unique output directory (e.g. `output/0d6d0268/`) will contain:
 
 - **Embeddings**: Stored in `embeddings/` subdirectory, organized by model name, if requested to be kept with command line argument `--keep-embeddings` (deleted by default).
-- **Predictions**: Stored in `predictions/` subdirectory, includes:
-  - Per-protein TSV files with predictions.
+- **Predictions**: Stored in `predictions/` subdirectory, includes the per-protein TSV files with predictions.
 - **Result Pages**: If `--generate_html` is used, interactive HTML pages are stored in `result_pages/`.
-- **`id_mapping.tsv`**: Two columns TSV file containing a mapping of the unique `Generated_ID` generated by Pegasus and the `Original_ID` fasta header of each input protein.
+- **`id_mapping.tsv`**: Two columns TSV file containing a mapping of the unique `Generated_ID` (P{1..n}) generated by Pegasus and the `Original_ID` fasta header of each input protein.
 
 
 ## View html result pages
 
 If `--generate_html` is used, interactive HTML pages are stored in `result_pages/`.
-To access the web pages easily, users can start a python html server:  
+
+1.	Using the Built-in HTTP Server
+
+   If you used the `--serve` flag, the result pages are automatically served via an HTTP server. By default, you can access the results at http://localhost:8000/results_overview.html.
+
+2.	Manual HTTP Server
 
    ```bash
    cd output/{job_id}/result_pages
