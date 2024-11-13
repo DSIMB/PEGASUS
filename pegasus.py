@@ -139,6 +139,12 @@ def parse_arguments():
         action="store_true",
         help="Input protein sequences are aligned or not",
     )
+    parser.add_argument(
+        "--max_seq_length",
+        type=int,
+        default=2048,
+        help="Maximum sequence length allowed for processing. Sequences longer than this will be skipped. Default is 2048."
+    )
     parser.add_argument('--serve', action='store_true', help='Start an HTTP server to serve the result pages.')
     parser.add_argument('--host', default='localhost', help='Hostname to use when serving the result pages. Default is "localhost".')
     parser.add_argument('--port', type=int, default=8000, help='Port to use when serving the result pages. Default is 8000.')
@@ -896,8 +902,13 @@ def main():
 
     # Constants and configurations
     global SEQ_LENGTH_THRESHOLD
-    SEQ_LENGTH_THRESHOLD = args.toks_per_batch
+    SEQ_LENGTH_THRESHOLD = args.max_seq_length
+    
     toks_per_batch = args.toks_per_batch
+    
+    if SEQ_LENGTH_THRESHOLD > toks_per_batch:
+        logging.error(f"Max sequence length (--max_seq_length) {SEQ_LENGTH_THRESHOLD} cannot be bigger than the max tokens per batch (--toks_per_batch) {toks_per_batch}")
+        sys.exit(1)
 
     # Output directories
     OUTPUT_EMBEDDINGS = os.path.join(unique_output_dir, 'embeddings')
