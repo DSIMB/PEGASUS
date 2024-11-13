@@ -1362,9 +1362,13 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
             return obj
         
     results_dict_serializable = convert_numpy(results_dict)
-
     # Also, write the results_dict to a results.json file in the same directory
     results_json_path = os.path.join(output_dir, 'results.json')
     with open(results_json_path, 'w') as json_file:
         json.dump(results_dict_serializable, json_file, indent=4)
 
+    if aligned_fasta:
+        results_dict_aligned_serializable = convert_numpy(results_dict_aligned)
+        results_json_aligned_path = os.path.join(output_dir, 'results_aligned.json')
+        with open(results_json_aligned_path, 'w') as json_aligned_file:
+            json.dump(results_dict_aligned_serializable, json_aligned_file, indent=4)

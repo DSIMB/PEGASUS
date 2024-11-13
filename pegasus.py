@@ -131,6 +131,14 @@ def parse_arguments():
         action='store_true',
         help="Keep the LLM raw embeddings in OUTPUT_EMBEDDINGS directory after being used. By default, the directory is deleted after being used."
     )
+    parser.add_argument(
+        "-a", "--aligned_fasta",
+        action="store_true",
+        help="Input protein sequences are aligned or not",
+    )
+    parser.add_argument('--serve', action='store_true', help='Start an HTTP server to serve the result pages.')
+    parser.add_argument('--host', default='localhost', help='Hostname to use when serving the result pages. Default is "localhost".')
+    parser.add_argument('--port', type=int, default=8000, help='Port to use when serving the result pages. Default is 8000.')
     return parser.parse_args()
 
 
@@ -161,12 +169,13 @@ def process_model_device_map(model_device_list):
     return model_device_map
 
 
-def validate_fasta(fasta_path):
+def validate_fasta(fasta_path, aligned_fasta):
     """
     Validate the FASTA file and extract sequences and labels.
 
     Args:
         fasta_path (str): Path to the FASTA file.
+        aligned_fasta (bool): Flag indicating if sequences are aligned.
 
     Returns:
         tuple: A tuple containing a list of generated labels, a list of sequences, and a mapping dictionary.
@@ -176,6 +185,7 @@ def validate_fasta(fasta_path):
         sys.exit(1)
 
     allowed_letters = set("ACDEFGHIKLMNPQRSTVWY")
+    allowed_letters_alignment = set("ACDEFGHIKLMNPQRSTVWY-")
     sequences = []
     labels = []
     id_mapping = {}
@@ -183,17 +193,30 @@ def validate_fasta(fasta_path):
     try:
         for i, record in enumerate(SeqIO.parse(fasta_path, "fasta")):
             seq = str(record.seq).upper()
-            if not set(seq).issubset(allowed_letters):
+            if aligned_fasta and not set(seq).issubset(allowed_letters_alignment):
+                logging.error(f"Invalid characters found in aligned sequence '{record.id}'. Allowed amino acids are: {allowed_letters_alignment}")
+                sys.exit(1)
+            elif not aligned_fasta and not set(seq).issubset(allowed_letters):
                 logging.error(f"Invalid characters found in sequence '{record.id}'. Allowed amino acids are: {allowed_letters}")
+                if set(seq).issubset(allowed_letters_alignment):
+                    logging.info("If your sequences are aligned, please add -a or --aligned argument.")
                 sys.exit(1)
             sequences.append(seq)
-            generated_id = f"P{i}"
+            generated_id = f"P{i+1}"
             labels.append(generated_id)
             id_mapping[generated_id] = record.description
     except Exception as e:
         logging.error(f"Error parsing FASTA file: {e}")
         sys.exit(1)
 
+    if aligned_fasta:
+        if len(set(len(seq) for seq in sequences)) != 1:
+            logging.error("All sequences must be of the same length for aligned FASTA.")
+            sys.exit(1)
+        # Check that there is more than one sequence
+        if len(sequences) <= 1:
+            logging.error("Aligned FASTA requires more than one sequence.")
+            sys.exit(1)
     if not sequences:
         logging.error("No valid sequences found in the FASTA file.")
         sys.exit(1)
@@ -278,7 +301,7 @@ def load_model_and_tokenizer(name: str, device, models_dir: str):
     if name in ['ankh_base', 'ankh_large']:
         model_path = os.path.join(models_dir, f'{name}.pt')
         tokenizer_path = os.path.join(models_dir, f'{name}_tokenizer.pt')
-        if os.path.exists(model_path):
+        if os.path.exists(model_path) and os.path.exists(tokenizer_path):
             model = torch.load(model_path, map_location=device).eval()
             tokenizer = torch.load(tokenizer_path, map_location=device)
         else:
@@ -315,7 +338,7 @@ def load_model_and_tokenizer(name: str, device, models_dir: str):
     return model, tokenizer
 
 
-def embed_ankh(seqs, tokenizer, encoder, device, toks_per_batch=3072):
+def embed_ankh(seqs, labels, tokenizer, encoder, device, toks_per_batch=3072):
     """
     Generate embeddings using Ankh models.
 
@@ -327,15 +350,15 @@ def embed_ankh(seqs, tokenizer, encoder, device, toks_per_batch=3072):
         toks_per_batch (int): Tokens per batch.
 
     Returns:
-        list: List of embeddings.
+        dict: Dictionary mapping labels to embeddings.
     """
-    results = []
-    dataset = FastaBatchedDataset.from_list(seqs, is_t5=False)
+    results = {}
+    dataset = FastaBatchedDataset.from_list(seqs, labels, is_t5=False)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     data_loader = torch.utils.data.DataLoader(dataset, batch_sampler=batches)
     with torch.no_grad():
-        for labels, strs in tqdm(data_loader, desc="Generating embeddings with Ankh models"):
-            sequences = [list(seq) for seq in strs]
+        for batch_labels, batch_strs in tqdm(data_loader, desc="Generating embeddings with Ankh models"):
+            sequences = [list(seq) for seq in batch_strs]
             outputs = tokenizer.batch_encode_plus(
                 sequences,
                 add_special_tokens=True,
@@ -349,11 +372,12 @@ def embed_ankh(seqs, tokenizer, encoder, device, toks_per_batch=3072):
             for j, emb in enumerate(embeddings):
                 seq_len = (attention_mask[j] == 1).sum() - 1
                 clean_emb = emb[1:seq_len+1].cpu()
-                results.append(clean_emb)
+                label = batch_labels[j]
+                results[label] = clean_emb
     return results
 
 
-def embed_prot_t5(seqs, tokenizer, encoder, device, toks_per_batch=3072):
+def embed_prot_t5(seqs, labels, tokenizer, encoder, device, toks_per_batch=3072):
     """
     Generate embeddings using ProtT5 model.
 
@@ -365,15 +389,15 @@ def embed_prot_t5(seqs, tokenizer, encoder, device, toks_per_batch=3072):
         toks_per_batch (int): Tokens per batch.
 
     Returns:
-        list: List of embeddings.
+        dict: Dictionary mapping labels to embeddings.
     """
-    results = []
-    dataset = FastaBatchedDataset.from_list(seqs, is_t5=True)
+    results = {}
+    dataset = FastaBatchedDataset.from_list(seqs, labels, is_t5=True)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     data_loader = torch.utils.data.DataLoader(dataset, batch_sampler=batches)
     with torch.no_grad():
-        for labels, strs, toks in tqdm(data_loader, desc="Generating embeddings with ProtT5"):
-            ids = tokenizer.batch_encode_plus(toks, add_special_tokens=True, padding=True)
+        for batch_labels, batch_strs, batch_toks in tqdm(data_loader, desc="Generating embeddings with ProtT5"):
+            ids = tokenizer.batch_encode_plus(batch_toks, add_special_tokens=True, padding=True)
             input_ids = torch.tensor(ids['input_ids']).to(device)
             attention_mask = torch.tensor(ids['attention_mask']).to(device)
             embedding = encoder(input_ids=input_ids, attention_mask=attention_mask)
@@ -381,11 +405,12 @@ def embed_prot_t5(seqs, tokenizer, encoder, device, toks_per_batch=3072):
             for i in range(len(embeddings)):
                 seq_len = (attention_mask[i] == 1).sum()
                 seq_emb = embeddings[i][:seq_len-1]
-                results.append(seq_emb)
+                label = batch_labels[i]
+                results[label] = seq_emb
     return results
 
 
-def embed_esm2(seqs, tokenizer, encoder, device, toks_per_batch=3072):
+def embed_esm2(seqs, labels, tokenizer, encoder, device, toks_per_batch=3072):
     """
     Generate embeddings using ESM2 model.
 
@@ -397,22 +422,23 @@ def embed_esm2(seqs, tokenizer, encoder, device, toks_per_batch=3072):
         toks_per_batch (int): Tokens per batch.
 
     Returns:
-        list: List of embeddings.
+        dict: Dictionary mapping labels to embeddings.
     """
-    results = []
-    dataset = FastaBatchedDataset.from_list(seqs, is_t5=False)
+    results = {}
+    dataset = FastaBatchedDataset.from_list(seqs, labels, is_t5=False)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     batch_converter = tokenizer  # tokenizer is actually the batch_converter
     data_loader = torch.utils.data.DataLoader(dataset, collate_fn=batch_converter, batch_sampler=batches)
     with torch.no_grad():
-        for labels, strs, tokens in tqdm(data_loader, desc="Generating embeddings with ESM2"):
+        for batch_labels, batch_strs, tokens in tqdm(data_loader, desc="Generating embeddings with ESM2"):
             tokens = tokens.to(device)
             outputs = encoder(tokens, repr_layers=[33], return_contacts=False)
             representations = outputs['representations'][33].cpu()
             for j, seq_emb in enumerate(representations):
-                seq_len = len(strs[j])
+                seq_len = len(batch_strs[j])
                 seq_emb = seq_emb[1:seq_len+1]
-                results.append(seq_emb)
+                label = batch_labels[j]
+                results[label] = seq_emb
     return results
 
 
@@ -440,11 +466,11 @@ def get_embeddings(seqs, labels, models_list, toks_per_batch, output_embeddings_
         
         logging.info(f"Generating embeddings using {model_name} on device {device}...")
         if model_name in ['ankh_base', 'ankh_large']:
-            embeddings = embed_ankh(seqs, tokenizer, model, device, toks_per_batch)
+            embeddings_dict = embed_ankh(seqs, labels, tokenizer, model, device, toks_per_batch)
         elif model_name == 'prot_t5_xl_uniref50':
-            embeddings = embed_prot_t5(seqs, tokenizer, model, device, toks_per_batch)
+            embeddings_dict = embed_prot_t5(seqs, labels, tokenizer, model, device, toks_per_batch)
         elif model_name == 'esm2_t36_3B_UR50D':
-            embeddings = embed_esm2(seqs, tokenizer, model, device, toks_per_batch)
+            embeddings_dict = embed_esm2(seqs, labels, tokenizer, model, device, toks_per_batch)
         else:
             raise ValueError(f"Unknown model {model_name}")
 
@@ -452,8 +478,11 @@ def get_embeddings(seqs, labels, models_list, toks_per_batch, output_embeddings_
         output_dir = os.path.join(output_embeddings_dir, model_name)
         os.makedirs(output_dir, exist_ok=True)
         logging.info(f"Saving embeddings for {model_name}...")
-        for idx, emb in enumerate(embeddings):
-            label = labels[idx]
+        for label in labels:
+            emb = embeddings_dict.get(label)
+            if emb is None:
+                logging.warning(f"No embedding found for label '{label}' in model '{model_name}'. Skipping.")
+                continue
             result = {
                 "label": label,
                 "embedding": emb
@@ -530,20 +559,6 @@ class CONV_2(nn.Module):
         return out
 
 
-def read_and_sample_pids(folder_path):
-    """
-    Read all IDs in a folder and return a list.
-
-    Args:
-        folder_path (str): Path to the folder where embeddings are.
-
-    Returns:
-        list: Available IDs in that embeddings folder.
-    """
-    pdbs = [f[:-3] for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
-    return pdbs
-
-
 def predict_protein_metrics(X, model, length, default_device, model_device_map):
     """
     Generate predictions for a single protein embedding.
@@ -572,20 +587,23 @@ def predict_protein_metrics(X, model, length, default_device, model_device_map):
         return pred_prot
 
 
-def predict_metrics_for_proteins(protein_ids, available_X, available_metrics, model_path, default_device, model_device_map):
+def predict_metrics_for_proteins(labels, seqs, aligned_fasta, available_X, available_metrics, model_path, default_device, model_device_map, gapped_seqs=None):
     """
     Load data and make predictions for a list of proteins.
 
     Args:
-        protein_ids (iterable): Names of protein IDs.
+        labels (iterable): Names of protein IDs.
+        seqs (list): List of sequences.
+        aligned_fasta (bool): Flag indicating if sequences are aligned.
         available_X (list): Paths to the embeddings.
         available_metrics (list): Paths to the folders with model data for each metric.
         model_path (list): Names of each model.
         default_device (str): Default computation device.
         model_device_map (dict): Mapping of model names to devices.
+        gapped_seqs (list): If aligned_fasta is True, contains the sequences with the gaps.
 
     Returns:
-        tuple: Dictionary of results and list of protein IDs.
+        tuple: Dictionary of results, Dictionary of aligned results (if aligned_fasta is True), and list of processed protein IDs.
     """
     results_dict = {}
     processed_protein_ids = []
@@ -595,66 +613,71 @@ def predict_metrics_for_proteins(protein_ids, available_X, available_metrics, mo
     device = torch.device("cuda" if device_choice == 'gpu' and torch.cuda.is_available() else "cpu")
     logging.info(f"Predict metrics on device {device}...")
 
-    for pid in tqdm(protein_ids, desc='Predicting metrics'):
-        pdb_id = pid
-
+    for prot_id in tqdm(labels, desc='Predicting metrics'):
         # Load embedding to get length
-        embedding_path = os.path.join(available_X[0], f"{pdb_id}.pt")
+        embedding_path = os.path.join(available_X[0], f"{prot_id}.pt")
         if not os.path.exists(embedding_path):
+            logging.warning(f"Embedding file '{embedding_path}' does not exist. Skipping protein '{prot_id}'.")
             continue  # Skip if embedding does not exist
 
         embedding_data = torch.load(embedding_path)
         length = embedding_data["embedding"].shape[0]
+        logging.debug(f"Protein ID: {prot_id}, Length: {length}")
 
         # Verify that sequence is not too long
         if length > SEQ_LENGTH_THRESHOLD:
-            continue
+            logging.warning(f"Protein '{prot_id}' exceeds the sequence length threshold. Skipping.")
+            continue  # Skip if protein is too long
 
-        # Load all embeddings for pid
+        # Load all embeddings for prot_id
         embeddings = {}
         embd_dims = {}
-        for embedding in available_X:
-            embedding_file = os.path.join(embedding, f"{pdb_id}.pt")
+        for embedding_dir, model_name in zip(available_X, model_path):
+            embedding_file = os.path.join(embedding_dir, f"{prot_id}.pt")
             if not os.path.exists(embedding_file):
+                logging.warning(f"Embedding file '{embedding_file}' does not exist for protein '{prot_id}'. Skipping this embedding.")
                 continue  # Skip if embedding file does not exist
             X = torch.load(embedding_file)["embedding"]
             embd_dim = X.shape[1]
-            embd_dims[embedding] = embd_dim
+            embd_dims[embedding_dir] = embd_dim
 
+            # Pad embeddings to SEQ_LENGTH_THRESHOLD
             X_padded = np.zeros((SEQ_LENGTH_THRESHOLD, embd_dim))
             X_padded[:len(X), :] = X
             X_padded = torch.from_numpy(X_padded.astype(np.float32)).to(device)
-            embeddings[embedding] = X_padded
+            embeddings[embedding_dir] = X_padded
 
         if not embeddings:
+            logging.warning(f"No embeddings loaded for protein '{prot_id}'. Skipping.")
             continue  # Skip if no embeddings loaded
 
-        # Initialize metrics
-        metric_dict = {'RMSF': None, 'PHI': None, 'PSI': None, 'LDDT': None}
-
-        # To save each individual embedding prediction
+        # Initialize metric dictionaries
+        metric_dict = {}
+        # Dictionary to collect predictions for each metric
+        metric_to_predictions = {'RMSF': [], 'PHI': [], 'PSI': [], 'LDDT': []}
+        # Dictionary to store all individual predictions
         all_predictions = {}
 
-        for metric_path, metric_name in zip(available_metrics, metric_dict):
-            mean_of_predictions = np.zeros(length, dtype='float64')
-            n_embeddings_used = 0
-
-            for embedding, model_name in zip(available_X, model_path):
-                if embedding not in embeddings:
+        # Loop over each metric
+        for metric_path, metric_name in zip(available_metrics, ['RMSF', 'PHI', 'PSI', 'LDDT']):
+            # Loop over each embedding/model
+            for embedding_dir, model_name in zip(available_X, model_path):
+                if embedding_dir not in embeddings:
                     continue  # Skip if embedding not loaded
-                X_padded = embeddings[embedding]
-                embd_dim = embd_dims[embedding]
+                X_padded = embeddings[embedding_dir]
+                embd_dim = embd_dims[embedding_dir]
 
-                # Load or get model from cache
+                # Load or retrieve model from cache
                 key = (metric_path, model_name, embd_dim)
                 if key not in model_cache:
-                    # Load model
+                    # Load model based on metric and embedding dimension
                     if metric_path == RMSF_MODEL_PATH or metric_path == LDDT_MODEL_PATH:
                         model = CONV_3L(embd_dim)
                     else:
                         model = CONV_2(embd_dim)
                     path = os.path.join(metric_path, model_name)
                     if not os.path.exists(path):
+                        logging.warning(f"Model file '{path}' does not exist. Skipping this model.")
                         continue  # Skip if model file does not exist
                     states = torch.load(path, map_location=device)['model_state_dict']
                     model.load_state_dict(states, strict=True)
@@ -666,29 +689,35 @@ def predict_metrics_for_proteins(protein_ids, available_X, available_metrics, mo
 
                 # Generate a prediction
                 predictions = predict_protein_metrics(X_padded, model, length, default_device, model_device_map)
-
-                # Append prediction to dictionary
-                model_short_name = model_name.split('_CV1.pth')[0]
+                
+                # Append prediction to the all_predictions dictionary
+                model_short_name = os.path.splitext(model_name)[0]
                 all_predictions[f'{metric_name}_{model_short_name}'] = predictions
 
-                # Add to mean vector
-                mean_of_predictions += np.array(predictions)
-                n_embeddings_used += 1
+                # Collect predictions per metric for statistical analysis
+                metric_to_predictions[metric_name].append(predictions)
 
-            # Calculate the mean of predictions
-            if n_embeddings_used > 0:
-                mean_of_predictions /= n_embeddings_used
+            # Compute mean and standard deviation for the current metric
+            if metric_to_predictions[metric_name]:
+                metric_values = np.array(metric_to_predictions[metric_name])  # Shape: (n_models, seq_length)
+                mean_of_predictions = np.mean(metric_values, axis=0)
+                std_of_predictions = np.std(metric_values, axis=0)
             else:
                 mean_of_predictions = np.zeros(length, dtype='float64')
+                std_of_predictions = np.zeros(length, dtype='float64')
+
+            # Update metric_dict with mean and std
             metric_dict[metric_name] = mean_of_predictions
+            metric_dict[f'{metric_name}_std'] = std_of_predictions
 
-        # Save mean results into the first dictionary
-        processed_protein_ids.append(pdb_id)
-        results_dict[pdb_id] = metric_dict
+        # Save mean results into the results dictionary
+        processed_protein_ids.append(prot_id)
+        results_dict[prot_id] = metric_dict
 
-        # Save per embedding data into a tsv file
+        # Save per-embedding predictions into a TSV file
         df = pd.DataFrame(all_predictions)
-        df.to_csv(os.path.join(RESULT_PATH, f'{pdb_id}_all_predictions.tsv'), sep='\t')
+        df = df.round(2)
+        df.to_csv(os.path.join(RESULT_PATH, f'{prot_id}_all_predictions.tsv'), sep='\t')
 
     # Clear model cache and free up GPU memory
     for model in model_cache.values():
@@ -696,7 +725,39 @@ def predict_metrics_for_proteins(protein_ids, available_X, available_metrics, mo
     model_cache.clear()
     torch.cuda.empty_cache()
 
-    return results_dict, processed_protein_ids
+    # Create the aligned results dictionary if sequences are aligned
+    if aligned_fasta:
+        # Map protein IDs to sequences with gaps
+        prot_id_to_seq = dict(zip(labels, gapped_seqs))
+        results_dict_aligned = {}
+        for prot_id, metric_dict in results_dict.items():
+            sequence = prot_id_to_seq.get(prot_id, "")
+            if not sequence:
+                logging.warning(f"No sequence found for protein ID '{prot_id}'. Skipping alignment.")
+                continue
+
+            aligned_metrics = {}
+            for metric_name, metric_values in metric_dict.items():
+                # Insert None for positions with gaps ('-')
+                aligned_metric_values_full = []
+                metric_iter = iter(metric_values)
+                for aa in sequence:
+                    if aa != '-':
+                        try:
+                            val = next(metric_iter)
+                        except StopIteration:
+                            raise ValueError(f"Ran out of values while processing aligned protein '{prot_id}'.")
+                        aligned_metric_values_full.append(val)
+                    else:
+                        aligned_metric_values_full.append(None)
+                aligned_metrics[metric_name] = aligned_metric_values_full
+
+            results_dict_aligned[prot_id] = aligned_metrics
+    else:
+        results_dict_aligned = None
+
+    return results_dict, results_dict_aligned, processed_protein_ids
+
 
 def format_duration(seconds):
     """
@@ -710,7 +771,7 @@ def format_duration(seconds):
         return f"{seconds} sec"
 
 
-def generate_results_overview_page(labels, seqs, id_mapping, results_dict, unique_output_dir, start_time, run_id):
+def generate_results_overview_page(labels, seqs, id_mapping, results_dict, results_dict_aligned, unique_output_dir, start_time, run_id, aligned_fasta):
     """
     Generate the results overview page with comparison functionality.
     """
@@ -721,7 +782,6 @@ def generate_results_overview_page(labels, seqs, id_mapping, results_dict, uniqu
 
     # Prepare data for the overview page
     headers = [id_mapping[label] for label in labels]
-    protein_ids = labels
     sequences = seqs
     date = datetime.today().strftime('%Y-%m-%d')
 
@@ -736,9 +796,11 @@ def generate_results_overview_page(labels, seqs, id_mapping, results_dict, uniqu
         date=date,
         headers=headers,
         sequences=sequences,
-        protein_ids=protein_ids,
+        protein_ids=labels,
         results_dict=results_dict,
-        output_dir=output_html_dir
+        results_dict_aligned=results_dict_aligned,
+        output_dir=output_html_dir,
+        aligned_fasta=aligned_fasta
     )
 
 
@@ -760,9 +822,16 @@ def main():
 
     # Set seed
     set_seed(args.seed)
+    
+    # Are sequences aligned?
+    aligned_fasta = args.aligned_fasta
 
     # Validate and parse FASTA file
-    labels, seqs, id_mapping = validate_fasta(args.input_fasta)
+    labels, seqs, id_mapping = validate_fasta(args.input_fasta, aligned_fasta)
+    gapped_seqs = None
+    if aligned_fasta:
+        gapped_seqs = seqs.copy()
+        seqs = [seq.replace("-", "") for seq in seqs]
 
     # Save the id mapping to a file
     mapping_file = os.path.join(unique_output_dir, 'id_mapping.tsv')
@@ -823,23 +892,11 @@ def main():
     RESULT_PATH = os.path.join(unique_output_dir, 'predictions')
     os.makedirs(RESULT_PATH, exist_ok=True)
 
-    # Get list of protein IDs
-    protein_ids = read_and_sample_pids(X_ankhL)
-
     # Fit the model and make predictions
     logging.info("Starting predictions...")
-    results_dict, processed_protein_ids = predict_metrics_for_proteins(
-        protein_ids, X_paths, metrics, models_names, default_device, model_device_map)
+    results_dict, results_dict_aligned, processed_protein_ids = predict_metrics_for_proteins(
+        labels, seqs, aligned_fasta, X_paths, metrics, models_names, default_device, model_device_map, gapped_seqs=gapped_seqs)
     logging.info("Predictions completed.")
-
-    # Save results
-    import pickle
-    with open(os.path.join(RESULT_PATH, 'results.pkl'), 'wb') as fp:
-        pickle.dump(results_dict, fp)
-
-    with open(os.path.join(RESULT_PATH, 'proteins.txt'), 'w') as filin:
-        for pid in processed_protein_ids:
-            filin.write(f'{pid}\n')
 
     # Generate result pages if requested
     if args.generate_html:
@@ -853,15 +910,18 @@ def main():
         output_html_dir = os.path.join(unique_output_dir, 'result_pages')
         result_page_generator.generate_result_pages(
             results_dict, modified_fasta_path, id_mapping, output_html_dir, predictions_dir=RESULT_PATH)
-        # Generate the results overview page
+        
+        # Pass the aligned results_dict_aligned to generate_results_overview_page
         generate_results_overview_page(
             labels=labels,
-            seqs=seqs,
+            seqs=seqs if not aligned_fasta else gapped_seqs,  # Original sequences with gaps if aligned_fasta is True
             id_mapping=id_mapping,
             results_dict=results_dict,
+            results_dict_aligned=results_dict_aligned,
             unique_output_dir=unique_output_dir,
             start_time=start_time,
-            run_id=run_id
+            run_id=run_id,
+            aligned_fasta=aligned_fasta
         )
         logging.info("Result web pages generated.")
 
@@ -869,9 +929,6 @@ def main():
     if not args.keep_embeddings:
         logging.info("Deleting embeddings directory as per default setting.")
         shutil.rmtree(OUTPUT_EMBEDDINGS)
-        
-    # Delete results.pkl
-    os.unlink(os.path.join(RESULT_PATH, 'results.pkl'))
 
     end_time = time.time()
     logging.info(f"Total runtime: {int(end_time - start_time)} seconds")
