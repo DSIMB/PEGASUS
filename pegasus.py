@@ -497,7 +497,7 @@ def get_embeddings(seqs, labels, models_list, toks_per_batch, output_embeddings_
         # Load model
         device_choice = model_device_map.get(model_name, default_device)
         device = torch.device("cuda" if device_choice == 'gpu' and torch.cuda.is_available() else "cpu")
-        logging.info(f"Loading model and tokenizer for {model_name} on device {device}...")
+        logging.info(f"Loading model and tokenizer for {model_name} on {device} device ...")
         model, tokenizer = load_model_and_tokenizer(model_name, device, models_dir)
         
         logging.info(f"Generating embeddings using {model_name} on device {device}...")
