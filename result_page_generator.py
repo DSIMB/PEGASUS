@@ -98,7 +98,7 @@ def draw_interactive_plot(result_dict, protein_id, output_dir, results_by_metric
     #Convert RMSF from nm to Angstrom
     result = result * 10
         
-    result = np.around(result, 2)
+    result = np.around(result, 3)
     x = np.arange(1, len(result)+1)
 
 
@@ -108,7 +108,7 @@ def draw_interactive_plot(result_dict, protein_id, output_dir, results_by_metric
     #Convert RMSF from nm to Angstrom
     metric_std = metric_std * 10
     
-    metric_std = np.around(metric_std, 2)
+    metric_std = np.around(metric_std, 3)
 
 
     # Create figure
@@ -174,12 +174,12 @@ def draw_interactive_plot(result_dict, protein_id, output_dir, results_by_metric
 
     # Get the mean result for the metric
     result = result_dict[protein_id][metric] 
-    result = np.around(result, 2)
+    result = np.around(result, 3)
     x = np.arange(1, len(result)+1)
 
     # Calculate standard deviation across embeddings
     metric_std = np.std(matrix, axis=1)
-    metric_std = np.around(metric_std, 2)
+    metric_std = np.around(metric_std, 3)
 
 
     # Create figure
@@ -245,12 +245,12 @@ def draw_interactive_plot(result_dict, protein_id, output_dir, results_by_metric
 
     # Get the mean result for the metric
     result = result_dict[protein_id][metric] 
-    result = np.around(result, 2)
+    result = np.around(result, 3)
     x = np.arange(1, len(result)+1)
 
     # Calculate standard deviation across embeddings
     metric_std = np.std(matrix, axis=1)
-    metric_std = np.around(metric_std, 2)
+    metric_std = np.around(metric_std, 3)
 
 
     # Create figure
@@ -315,12 +315,12 @@ def draw_interactive_plot(result_dict, protein_id, output_dir, results_by_metric
 
     # Get the mean result for the metric
     result = result_dict[protein_id][metric] 
-    result = np.around(result, 2)
+    result = np.around(result, 3)
     x = np.arange(1, len(result)+1)
 
     # Calculate standard deviation across embeddings
     metric_std = np.std(matrix, axis=1)
-    metric_std = np.around(metric_std, 2)
+    metric_std = np.around(metric_std, 3)
 
 
     # Create figure
@@ -397,7 +397,7 @@ def draw_interactive_plot_all(result_dict, protein_id, output_dir):
     for metric in METRICS:
         values = result_dict[protein_id][metric]
         normalized_values = np.interp(values, (values.min(), values.max()), (0, 1))
-        normalized_metrics[metric] = np.around(normalized_values, 2)
+        normalized_metrics[metric] = np.around(normalized_values, 3)
 
     # Prepare x-axis values
     x = np.arange(1, len(next(iter(normalized_metrics.values()))) + 1)
@@ -475,9 +475,8 @@ def write_result_page(result_dict, protein_realname, protein_id, output_dir, seq
     for metric in metrics:
         values = result_dict[protein_id][metric]
         normalized_values = np.interp(values, (values.min(), values.max()), (0, 1))
-        normalized_metrics[metric] = np.around(normalized_values, 2)
-        rounded_values = np.around(values, 2)
-        rounded_metrics[metric] = rounded_values
+        normalized_metrics[metric] = np.around(normalized_values, 3)
+        rounded_metrics[metric] = np.around(values, 3)
 
     # Generate the sequenceTrack content
     sequence_track_displays = []
@@ -498,8 +497,8 @@ def write_result_page(result_dict, protein_realname, protein_id, output_dir, seq
     color = colors[0]
     
     track_data_entries = ''
-    for idx, (norm_value, value) in enumerate(zip(normalized_metrics[metric], rounded_metrics[metric]), start=1):
-        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value} Å\"}},\n"
+    for idx, (norm_value, value) in enumerate(zip(normalized_metrics[metric], rounded_metrics[metric]*10), start=1):
+        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value:.2f} Å\"}},\n"
     
     area_track = f"""
     const {metric.lower()}Track = {{
@@ -526,7 +525,7 @@ def write_result_page(result_dict, protein_realname, protein_id, output_dir, seq
     
     track_data_entries = ''
     for idx, (norm_value, value) in enumerate(zip(normalized_metrics[metric], rounded_metrics[metric]), start=1):
-        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value} °\"}},\n"
+        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value:.2f} °\"}},\n"
     
     area_track = f"""
     const {metric.lower()}Track = {{
@@ -554,7 +553,7 @@ def write_result_page(result_dict, protein_realname, protein_id, output_dir, seq
     
     track_data_entries = ''
     for idx, (norm_value, value) in enumerate(zip(normalized_metrics[metric], rounded_metrics[metric]), start=1):
-        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value} °\"}},\n"
+        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value:.2f} °\"}},\n"
     
     area_track = f"""
     const {metric.lower()}Track = {{
@@ -582,7 +581,7 @@ def write_result_page(result_dict, protein_realname, protein_id, output_dir, seq
     
     track_data_entries = ''
     for idx, (norm_value, value) in enumerate(zip(normalized_metrics[metric], rounded_metrics[metric]), start=1):
-        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value}\"}},\n"
+        track_data_entries += f"{{begin:{idx}, value:{norm_value}, featureId:\"value: {value:.2f}\"}},\n"
     
     area_track = f"""
     const {metric.lower()}Track = {{
@@ -906,9 +905,21 @@ def generate_result_pages(result_dict, fasta_file, id_mapping, output_dir='resul
         write_result_page(result_dict, protein_realname, protein_id, output_dir, sequence)
 
 
-def write_results_overview_page(job_id, job_duration, date, headers, sequences, protein_ids, results_dict, output_dir, aligned_fasta):
+def write_results_overview_page(job_id, job_duration, date, headers, sequences, protein_ids, results_dict, results_dict_aligned, output_dir, aligned_fasta):
     """
     Generate the results overview HTML page with comparison functionality.
+    
+    Args:
+        job_id (str): Job identifier.
+        job_duration (str): Duration of the job.
+        date (str): Date of the job.
+        headers (list): List of protein headers.
+        sequences (list): List of protein sequences.
+        protein_ids (list): List of protein IDs.
+        results_dict (dict): Dictionary containing results.
+        results_dict_aligned (dict or None): Dictionary containing aligned results with None for gaps.
+        output_dir (str): Directory to save the overview page.
+        aligned_fasta (bool): Flag indicating if sequences are aligned.
     """
     import json
 
@@ -923,6 +934,7 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
         seq_length = len(sequence)
         table_rows += f'''
             <tr>
+                <td style="width: 2%; cursor:pointer;"></td><!-- Checkbox column; leave empty -->
                 <td class="details-control" style="width: 2%; cursor:pointer;">
                     <span class="me-2">
                         <!-- Arrow icon -->
@@ -931,9 +943,6 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                             <path d="M12 8L6 12V4l6 4z"/>
                         </svg>
                     </span>
-                </td>
-                <td class="text-center" style="width: 3%;">
-                    <input type="checkbox" class="protein-checkbox" data-length="{seq_length}" data-unique-id="{prot_id}" value="{prot_id}">
                 </td>
                 <td class="td-ellipsis"><strong>{prot_id}</strong> - {header}</td>
                 <td class="text-center" style="width: 8%;">{seq_length}</td>
@@ -979,20 +988,17 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <!-- DataTables CSS -->
-    <link href="https://cdn.datatables.net/v/bs5/dt-1.13.4/datatables.min.css" rel="stylesheet">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <link href="https://cdn.datatables.net/v/bs5/dt-2.1.8/b-3.1.2/b-colvis-3.1.2/b-html5-3.1.2/r-3.0.3/sl-2.1.0/datatables.min.css" rel="stylesheet">
+    <script src="https://cdn.datatables.net/v/bs5/dt-2.1.8/b-3.1.2/b-colvis-3.1.2/b-html5-3.1.2/r-3.0.3/sl-2.1.0/datatables.min.js"></script>
 
     <!-- Plotly -->
     <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
 
     <!-- Custom styles for this template -->
     <link href="https://dsimb.inserm.fr/PEGASUS/css/custom_features.css" rel="stylesheet" />
-
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-    <!-- DataTables JS -->
-    <script src="https://cdn.datatables.net/v/bs5/dt-1.13.4/datatables.min.js"></script>
 
 </head>
 
@@ -1013,6 +1019,7 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
             <h1 class="alert-heading">Results Overview</h1>
             <strong>Job ID:</strong> {job_id}<br>
             <strong>Launch date:</strong> {date}<br>
+            <strong>Number of sequences:</strong> {len(protein_ids)}<br>
             <strong>Run time:</strong> {job_duration}<br>
         </div>
 
@@ -1031,10 +1038,8 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                 <table id="queries_table" class="table align-middle table-hover">
                     <thead>
                         <tr>
+                            <th class="dt-checkboxes-select-all"></th>
                             <th></th> <!-- Expand/Collapse control column -->
-                            <th>
-                                <input type="checkbox" id="select-all"/>
-                            </th>
                             <th>Name</th>
                             <th>Length</th>
                             <th>Sequence</th> <!-- Hidden column -->
@@ -1070,17 +1075,29 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             }});
         }});
+        
+        // Embed the aligned_fasta flag as a JavaScript variable
+        var aligned_fasta = {str(aligned_fasta).lower()};
     
         // JavaScript code to handle table interactions and comparison functionality
 
-        // Load results.json
+        // Load the appropriate JSON file based on the aligned_fasta flag
         let resultsDict;
-        fetch('results.json')
+        let resultsFile = aligned_fasta ? 'results_aligned.json' : 'results.json';
+        fetch(resultsFile)
             .then(response => response.json())
             .then(data => {{
                 resultsDict = data;
                 initializePage();
             }});
+            
+        var selectedLength = null;
+        var lengthFilterFunction = function(settings, data, dataIndex) {{
+            if (selectedLength === null) {{
+                return true; // No filtering when no length is selected
+            }}
+            return data[3] === selectedLength;
+        }};
 
         function initializePage() {{
             // DataTables initialization
@@ -1093,27 +1110,95 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                     'columnDefs': [
                         {{ 'orderable': false, 'targets': [0,1,5,6] }}, // Disable ordering on certain columns
                         {{ 'visible': false, 'targets': 4 }}, // Hide the sequence column
-                    ]
+                        {{
+                            orderable: false,
+                            render: DataTable.render.select(),
+                            targets: 0
+                        }}
+                    ],
+                    'select': {{
+                        style: 'multi',
+                        selector: 'td:first-child'
+                    }}
                 }});
 
-                var compareButton = $("#compareButton");
-                let selectedProteins = [];
-                let selectedLength = null;
-                
-                // Custom search function to filter by length
-                $.fn.dataTable.ext.search.push(
-                    function(settings, data, dataIndex) {{
-                        if (selectedLength === null) {{
-                            return true;
+                // Function to check if all proteins have the same length
+                function allSameLength(data) {{
+                    var length = data[0][3]; // Length is in the 4th column (index 3)
+                    return data.every(function(row) {{
+                        return row[3] === length;
+                    }});
+                }}
+
+                // Handle event when a checkbox is clicked
+                table.on('select.dt deselect.dt', function(e, api, type, indexes) {{
+                    var selectedRowsData = table.rows({{ selected: true }}).data().toArray();
+
+                    if (selectedRowsData.length > 0) {{
+                        // Set the selected length based on the first selected row
+                        selectedLength = selectedRowsData[0][3]; // Length is in the 4th column (index 3)
+
+                        // Check if all selected rows have the same length
+                        var allSameLengthSelected = selectedRowsData.every(function(row) {{
+                            return row[3] === selectedLength;
+                        }});
+
+                        if (!allSameLengthSelected) {{
+                            alert('Selected proteins must have the same length.');
+                            table.rows(indexes).deselect();
+                            selectedLength = null; // Reset the selected length
+                            return;
                         }}
-                        var length = parseInt(data[3]) || 0; // Column index for Length
-                        if (length === selectedLength) {{
-                            return true;
+
+                        // Add the filter function if not already added
+                        if ($.fn.dataTable.ext.search.indexOf(lengthFilterFunction) === -1) {{
+                            $.fn.dataTable.ext.search.push(lengthFilterFunction);
                         }}
-                        return false;
+                    }} else {{
+                        // No rows selected; remove the filter function
+                        selectedLength = null; // Reset the selected length
+                        var index = $.fn.dataTable.ext.search.indexOf(lengthFilterFunction);
+                        if (index !== -1) {{
+                            $.fn.dataTable.ext.search.splice(index, 1);
+                        }}
                     }}
-                );
-                
+                    table.draw();
+                    updateCompareButton(selectedRowsData);
+                }});
+
+                // Handle click on "Select all" control
+                $('#queries_table').on('click', 'th.dt-checkboxes-select-all', function() {{
+                    var allData = table.rows({{ filter: 'applied' }}).data().toArray();
+
+                    if (allData.length > 0 && allSameLength(allData)) {{
+                        // Proceed with the default behavior
+                    }} else {{
+                        alert('Cannot select all. Not all proteins have the same length.');
+                        // Prevent default behavior
+                        $('input[type="checkbox"]', this).prop('checked', false);
+                    }}
+                }});
+
+                // Function to update the "Compare" button state
+                function updateCompareButton(selectedRows) {{
+                    if (selectedRows.length >= 2) {{
+                        $("#compareButton").prop("disabled", false);
+                    }} else {{
+                        $("#compareButton").prop("disabled", true);
+                        // Remove the comparison plot if it exists
+                        $("#comparison_section").empty();
+                    }}
+                }}
+
+                // Handle Compare Button Click
+                $("#compareButton").on("click", function() {{
+                    var selectedRowsData = table.rows({{ selected: true }}).data().toArray();
+                    var proteinIds = selectedRowsData.map(function(row) {{
+                        return row[2].match(/<strong>(.*?)<\\/strong>/)[1]; // Extract protein ID from the HTML
+                    }});
+                    generateComparisonPlot(proteinIds);
+                }});
+
                 // Add event listener for opening and closing details
                 $('#queries_table tbody').on('click', 'td.details-control', function () {{
                     var tr = $(this).closest('tr');
@@ -1141,80 +1226,10 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                             '<p class="text-break font-monospace">'+sequence+'</p>'+
                             '</div>';
                 }}
-
-                // Handle click on "select all" control
-                $('#select-all').on('click', function(){{
-                    // Get all rows with search applied
-                    var rows = table.rows({{ 'search': 'applied' }}).nodes();
-                    // Check/uncheck checkboxes
-                    $('input[type="checkbox"].protein-checkbox', rows).prop('checked', this.checked).trigger('change');
-                }});
-
-                // Handle click on individual checkbox to update "select all" control
-                $('#queries_table tbody').on('change', 'input[type="checkbox"].protein-checkbox', function(){{
-                    selectedProteins = $(".protein-checkbox:checked").map(function(){{
-                        return {{
-                            id: $(this).val(),
-                            length: parseInt($(this).data('length')),
-                            unique_id: $(this).data('unique-id')
-                        }};
-                    }}).get();
-
-                    if(selectedProteins.length >=1){{
-                        const firstLength = selectedProteins[0].length;
-                        const allSameLength = selectedProteins.every(p => p.length === firstLength);
-                        if(allSameLength){{
-                            selectedLength = firstLength;
-                            table.draw();
-                            if(selectedProteins.length >=2){{
-                                compareButton.prop("disabled", false);
-                            }} else {{
-                                compareButton.prop("disabled", true);
-                            }}
-                        }} else {{
-                            compareButton.prop("disabled", true);
-                            alert("Selected proteins must have the same length for comparison.");
-                            // Uncheck the last checkbox
-                            $(this).prop('checked', false);
-                            selectedProteins = $(".protein-checkbox:checked").map(function(){{
-                                return {{
-                                    id: $(this).val(),
-                                    length: parseInt($(this).data('length')),
-                                    unique_id: $(this).data('unique-id')
-                                }};
-                            }}).get();
-                            if(selectedProteins.length === 0){{
-                                selectedLength = null;
-                            }} else {{
-                                selectedLength = selectedProteins[0].length;
-                            }}
-                            table.draw();
-                        }}
-                    }} else {{
-                        selectedLength = null;
-                        compareButton.prop("disabled", true);
-                        table.draw();
-                    }}
-
-                    // Remove Comparison Section When No Checkboxes are Checked
-                    if(selectedProteins.length === 0){{
-                        if($("#comparison_section").length){{
-                            $("#comparison_section").empty(); // Clears the contents without removing the div
-                        }}
-                    }}
-                }});
-
-                // Handle Compare Button Click
-                compareButton.on("click", function(){{
-                    const proteinIds = selectedProteins.map(p => p.id);
-                    const uniqueIds = selectedProteins.map(p => p.unique_id);
-                    // Generate comparison plot
-                    generateComparisonPlot(proteinIds, uniqueIds);
-                }});
             }});
         }}
 
-        function generateComparisonPlot(proteinIds, uniqueIds) {{
+        function generateComparisonPlot(proteinIds) {{
             // Ensure all proteins have the same length
             const lengths = proteinIds.map(id => resultsDict[id]['RMSF'].length);
             if (!lengths.every(len => len === lengths[0])) {{
@@ -1225,30 +1240,31 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
             // Prepare data for Plotly
             const data = [];
             const metrics = ['RMSF', 'PHI', 'PSI', 'LDDT'];
-            const colors = ['rgba(221, 97, 74, 1)', 'rgba(115, 165, 128, 1)',
-                            'rgba(127, 106, 147, 1)', 'rgba(213, 160, 33, 1)'];
             const metric_titles = ['RMSF', 'Std. Phi', 'Std. Psi', 'Mean LDDT'];
             const units = ['Å', '°', '°', ''];
 
             proteinIds.forEach((protId, idx) => {{
                 metrics.forEach((metric, m_idx) => {{
                     let yValues = resultsDict[protId][metric];
+                    let stdValues = resultsDict[protId][metric + '_std'];
                     let xValues = Array.from({{length: yValues.length}}, (_, i) => i + 1);
 
                     // If RMSF, convert from nm to Å
+                    // To all: round to 2 decimals
                     if (metric === 'RMSF') {{
-                        yValues = yValues.map(v => v * 10);
+                        yValues = yValues.map(v => v != null ? v * 10 : v);
+                        stdValues = stdValues.map(v => v != null ? v * 10 : v);
                     }}
 
                     data.push({{
                         x: xValues,
                         y: yValues,
+                        customdata: stdValues,
                         mode: 'lines',
-                        name: `${{uniqueIds[idx]}} - ${{metric_titles[m_idx]}}`,
-                        line: {{ color: colors[m_idx % colors.length] }},
+                        line: {{ width: 2 }},
+                        name: `${{proteinIds[idx]}} - ${{metric_titles[m_idx]}}`,
                         visible: m_idx === 0, // Only show RMSF by default
-                        customdata: yValues.map(v => v.toFixed(2)),
-                        hovertemplate: `<br>${{uniqueIds[idx]}} - ${{metric_titles[m_idx]}} = %{{customdata}} ${{units[m_idx]}}<extra></extra>`
+                        hovertemplate: `Pos: %{{x}}<br>${{proteinIds[idx]}} = %{{y:.2f}} ± %{{customdata:.2f}} ${{units[m_idx]}}<extra></extra>`
                     }});
                 }});
             }});
@@ -1257,7 +1273,7 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                 title: '',
                 xaxis: {{ title: '<b>Position</b>' }},
                 yaxis: {{ title: '<b>Pred. RMSF (Å)</b>' }},
-                hovermode: 'x unified',
+                hovermode: 'closest',
                 template: 'plotly_white',
                 hoverlabel: {{ bgcolor: 'white', font: {{ color: 'black' }} }},
                 legend: {{
@@ -1290,6 +1306,51 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
             }}
 
             Plotly.newPlot('comparison_plot', data, layout);
+            
+            // Add hover and unhover event handlers
+            var plotDiv = document.getElementById('comparison_plot');
+            var highlightedTraceIndex = null;
+
+            plotDiv.on('plotly_hover', function(eventdata){{
+                var mouseY = eventdata.event.clientY;
+                var plotRect = plotDiv.getBoundingClientRect();
+                var mouseYRelative = mouseY - plotRect.top;
+
+                var minDistance = Infinity;
+                var closestTraceIndex = null;
+
+                for(var i=0; i<eventdata.points.length; i++){{
+                    var point = eventdata.points[i];
+                    var curveNumber = point.curveNumber;
+                    var yPixel = point.yaxis.l2p(point.y);
+                    var yAxisOffset = point.yaxis._offset;
+                    var yTotal = yAxisOffset + yPixel;
+
+                    var distance = Math.abs(yTotal - mouseYRelative);
+                    if(distance < minDistance){{
+                        minDistance = distance;
+                        closestTraceIndex = curveNumber;
+                    }}
+                }}
+
+                if(closestTraceIndex !== null && closestTraceIndex !== highlightedTraceIndex){{
+                    // Reset previous trace line width
+                    if(highlightedTraceIndex !== null){{
+                        Plotly.restyle('comparison_plot', {{'line.width': 2}}, [highlightedTraceIndex]);
+                    }}
+                    // Set new trace line width
+                    Plotly.restyle('comparison_plot', {{'line.width': 4}}, [closestTraceIndex]);
+                    highlightedTraceIndex = closestTraceIndex;
+                }}
+            }});
+
+            plotDiv.on('plotly_unhover', function(eventdata){{
+                // Reset the line width of the highlighted trace
+                if(highlightedTraceIndex !== null){{
+                    Plotly.restyle('comparison_plot', {{'line.width': 2}}, [highlightedTraceIndex]);
+                    highlightedTraceIndex = null;
+                }}
+            }});
 
             window.filterPlot = function(metric) {{
                 var plotDiv = document.getElementById('comparison_plot');
@@ -1353,12 +1414,19 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
     # Before saving results_dict to results.json, convert numpy arrays to lists
     def convert_numpy(obj):
         if isinstance(obj, dict):
+            # Recursively convert dictionary values
             return {k: convert_numpy(v) for k, v in obj.items()}
         elif isinstance(obj, list):
+            # Recursively convert list elements
             return [convert_numpy(v) for v in obj]
         elif isinstance(obj, np.ndarray):
+            # Convert NumPy arrays to lists
             return obj.tolist()
+        elif isinstance(obj, (np.generic,)):
+            # Convert NumPy scalar types to native Python types
+            return obj.item()
         else:
+            # Return the object as is if it's already a native type
             return obj
         
     results_dict_serializable = convert_numpy(results_dict)
