@@ -16,6 +16,9 @@ import time
 import warnings
 import uuid
 import shutil
+import http.server
+import socketserver
+import threading
 
 import numpy as np
 import pandas as pd
@@ -92,13 +95,13 @@ def parse_arguments():
         help="Default computation device to use ('cpu' or 'gpu') for models not specified in --model_device_map. Default is 'cpu'."
     )
     parser.add_argument(
-        "--models_dir",
+        "-m", "--models_dir",
         type=str,
         default=os.environ.get('MODELS_DIR', 'models'),
         help="Path to the directory containing pre-trained models."
     )
     parser.add_argument(
-        "--output_dir",
+        "-o", "--output_dir",
         type=str,
         default=os.environ.get('OUTPUT_DIR', 'output'),
         help="Directory to save output files."
@@ -110,24 +113,24 @@ def parse_arguments():
         help=f"Specify device for each model in the format model_name:device (e.g., prot_t5_xl_uniref50:cpu). Accepted models are: {', '.join(ACCEPTED_MODELS)}."
     )
     parser.add_argument(
-        "--seed",
+        "-s", "--seed",
         type=int,
         default=42,
         help="Random seed for reproducibility."
     )
     parser.add_argument(
-        "--toks_per_batch",
+        "-t", "--toks_per_batch",
         type=int,
         default=2048,
-        help="Tokens per batch to use during embedding generation. Default is 3074."
+        help="Tokens per batch to use during embedding generation. Default is 2048."
     )
     parser.add_argument(
-        "--generate_html",
+        "-g", "--generate_html",
         action='store_true',
         help="Generate result web pages for each protein."
     )
     parser.add_argument(
-        "--keep_embeddings",
+        "-k", "--keep_embeddings",
         action='store_true',
         help="Keep the LLM raw embeddings in OUTPUT_EMBEDDINGS directory after being used. By default, the directory is deleted after being used."
     )
@@ -140,6 +143,33 @@ def parse_arguments():
     parser.add_argument('--host', default='localhost', help='Hostname to use when serving the result pages. Default is "localhost".')
     parser.add_argument('--port', type=int, default=8000, help='Port to use when serving the result pages. Default is 8000.')
     return parser.parse_args()
+
+def start_http_server(output_dir='result_pages', hostname='localhost', port=8000):
+    Handler = http.server.SimpleHTTPRequestHandler
+
+    # Change the current directory to the output directory
+    os.chdir(output_dir)
+
+    # Start the server in a separate thread
+    def serve():
+        with socketserver.TCPServer((hostname, port), Handler) as httpd:
+            print(f"Serving HTTP on http://{hostname}:{port}/results_overview.html (press Ctrl+C to stop)")
+            try:
+                httpd.serve_forever()
+            except KeyboardInterrupt:
+                print("Shutting down the server...")
+            httpd.server_close()
+
+    server_thread = threading.Thread(target=serve)
+    server_thread.daemon = True  # Allows program to exit even if thread is running
+    server_thread.start()
+
+    # Keep the main thread alive to keep the server running
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt:
+        print("Shutting down the server...")
 
 
 def process_model_device_map(model_device_list):
@@ -933,6 +963,9 @@ def main():
     end_time = time.time()
     logging.info(f"Total runtime: {int(end_time - start_time)} seconds")
     logging.info(f"Results saved in: {unique_output_dir}")
+
+    if args.generate_html and args.serve:
+        start_http_server(output_dir=output_html_dir, hostname=args.host, port=args.port)
 
 if __name__ == '__main__':
     main()
