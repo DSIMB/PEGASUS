@@ -57,26 +57,16 @@
 - **Python**: Version 3.8 or higher
 - **CUDA**: For GPU support (optional)
 - **Conda**: Package and environment management
-- **Docker**: For containerized execution (optional)
+- **Docker** (optional): For containerized execution
 
-
-### Conda Installation
-
-1. **Clone the Repository**
+### 1. Clone the Repository
 
    ```bash
    git clone https://github.com/DSIMB/PEGASUS.git
    cd PEGASUS
    ```
 
-2. **Create and Activate the Conda Environment**
-
-   ```bash
-   conda env create -f pegasus.yml
-   conda activate pegasus
-   ```
-
-### Download Pegasus weights (1.3 Gb)
+### 2. Download Pegasus weights (1.3 Gb)
 
 Download and extract Pegasus weights in the `models` directory.  
 
@@ -84,12 +74,21 @@ Download and extract Pegasus weights in the `models` directory.
    aria2c -d ./models https://dsimb.inserm.fr/PEGASUS/models/pegasus_weights.tar.gz && tar -xzvf ~/models/pegasus_weights.tar.gz -C ./models
    ```
 
-### Docker Installation
+### 3. Conda Installation (not necessary if using Docker)
+
+Create and Activate the Conda Environment
+
+   ```bash
+   conda env create -f pegasus.yml
+   conda activate pegasus
+   ```
+
+### 3 (bis). Docker Installation
 
 1) Install [NVIDIA Container Toolkit for GPU](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) support.
 2) Setup running [Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
-1. **Build or download the Docker Image**
+3.1. **Build or download the Docker Image**
 
    ```bash
    docker pull dsimb/pegasus
@@ -99,7 +98,7 @@ Download and extract Pegasus weights in the `models` directory.
    docker build -t dsimb/pegasus .
    ```
 
-2. **Run the Docker Container**
+3.2. **Run the Docker Container**
 
    ```bash
    docker run -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) --gpus all -v /path/to/input:/input -v /path/to/output:/output -v /path/to/models:/models dsimb/pegasus -i /input/sequences.fasta --output_dir /output --models_dir /models
