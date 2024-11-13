@@ -46,7 +46,7 @@ def load_tsv(protein_id, predictions_dir='predictions'):
     Returns:
         list: A list of numpy arrays, each containing per-embedding predictions for a metric.
     """
-    filepath = os.path.join(predictions_dir, f'{protein_id}_all_predictions.tsv')
+    filepath = os.path.join(predictions_dir, f'{protein_id}_raw.tsv')
     df = pd.read_csv(filepath, sep='\t')
 
     # Check if DataFrame has at least 2 columns
@@ -948,7 +948,7 @@ def write_results_overview_page(job_id, job_duration, date, headers, sequences, 
                 <td class="text-center" style="width: 8%;">{seq_length}</td>
                 <td>{sequence}</td> <!-- Hidden column -->
                 <td class="text-center" style="width: 3%;">
-                    <a class="btn" role="button" href="../predictions/{prot_id}_all_predictions.tsv" download="{prot_id}_all_predictions.tsv">
+                    <a class="btn" role="button" href="../predictions/{prot_id}_predictions.tsv" download="{prot_id}_predictions.tsv">
                         <!-- Download icon -->
                         <svg width="1.2em" xmlns="http://www.w3.org/2000/svg" fill="none"
                              viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="align-text-top">

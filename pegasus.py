@@ -638,6 +638,8 @@ def predict_metrics_for_proteins(labels, seqs, aligned_fasta, available_X, avail
     results_dict = {}
     processed_protein_ids = []
     model_cache = {}
+    
+    prot_id_to_seq = dict(zip(labels, seqs))
 
     device_choice = model_device_map.get("pegasus", default_device)
     device = torch.device("cuda" if device_choice == 'gpu' and torch.cuda.is_available() else "cpu")
@@ -739,6 +741,21 @@ def predict_metrics_for_proteins(labels, seqs, aligned_fasta, available_X, avail
             # Update metric_dict with mean and std
             metric_dict[metric_name] = mean_of_predictions
             metric_dict[f'{metric_name}_std'] = std_of_predictions
+             
+        # Write the mean of each metric for each protein in a TSV file
+        sequence = prot_id_to_seq[prot_id]
+        mean_RMSF = metric_dict['RMSF']
+        std_RMSF = metric_dict['RMSF_std']
+        mean_Phi = metric_dict['PHI']
+        std_Phi = metric_dict['PHI_std']
+        mean_Psi = metric_dict['PSI']
+        std_Psi = metric_dict['PSI_std']
+        mean_LDDT = metric_dict['LDDT']
+        std_LDDT = metric_dict['LDDT_std']
+        df_dl = pd.DataFrame(list(zip(sequence, mean_RMSF, std_RMSF, mean_Phi, std_Phi, mean_Psi, std_Psi, mean_LDDT, std_LDDT)),
+                            columns=["res", "mean_RMSF", "std_RMSF", "mean_STD_PHI", "std_STD_PHI", "mean_STD_PSI", "std_STD_PSI", "mean_MEAN_LDDT", "std_MEAN_LDDT"])
+        df_dl = df_dl.round(3)
+        df_dl.to_csv(os.path.join(RESULT_PATH, f'{prot_id}_predictions.tsv'), sep="\t", index=False)
 
         # Save mean results into the results dictionary
         processed_protein_ids.append(prot_id)
@@ -746,8 +763,9 @@ def predict_metrics_for_proteins(labels, seqs, aligned_fasta, available_X, avail
 
         # Save per-embedding predictions into a TSV file
         df = pd.DataFrame(all_predictions)
-        df = df.round(2)
-        df.to_csv(os.path.join(RESULT_PATH, f'{prot_id}_all_predictions.tsv'), sep='\t')
+        df = df.round(3)
+        df.to_csv(os.path.join(RESULT_PATH, f'{prot_id}_raw.tsv'), sep='\t')
+
 
     # Clear model cache and free up GPU memory
     for model in model_cache.values():
