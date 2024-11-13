@@ -126,19 +126,21 @@ usage: pegasus.py [-h] -i INPUT_FASTA [-d {cpu,gpu}] [-m MODELS_DIR] [-o OUTPUT_
                   [-s SEED] [-t TOKS_PER_BATCH] [-g] [-k] [-a] [--serve] [--host HOST] [--port PORT]
 ```
 
-- `-i`, `--input_fasta`: **(Required)** Path to the input (multi)FASTA file containing protein sequences.
-- `-d`, `--default_device`: Default computation device (`cpu` or `gpu`). Default is `cpu`.
-- `-m`, `--models_dir`: Directory containing pre-trained models. Default is the environment variable `MODELS_DIR` or `models`.
-- `-o`, `--output_dir`: Directory to save output files. Default is the environment variable `OUTPUT_DIR` or `output`.
-- `--model_device_map`: Specify device for each model in the format `model_name:device` (e.g., `prot_t5_xl_uniref50:gpu`). Accepted models are `ankh_base`, `ankh_large`, `prot_t5_xl_uniref50`, `esm2_t36_3B_UR50D`, `pegasus`.
-- `-s`, `--seed`: Random seed for reproducibility. Default is `42`.
--	`-t`, `--toks_per_batch`: Maximum tokens per batch to use during embedding generation. Default is 2048.
-- `-g`, `--generate_html`: Include this flag to generate result web pages for each protein as well as an overview page.
-- `-k`, `--keep_embeddings`: Keep the LLMs raw embeddings in OUTPUT_EMBEDDINGS directory after being used. By default, the directory is deleted after being used.
-- `-a`, `--aligned_fasta`:   Input protein sequences are aligned or not
-- `--serve`: Start an HTTP server at the end to serve the result pages.
-- `--host `: Hostname to use when serving the result pages. Default is "localhost".
-- `--port`: Port to use when serving the result pages. Default is 8000.
+| **Option**             | **Description**                                                                                                                                                 |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `input_fasta`          | **(Required)** Path to the input (multi)FASTA file containing protein sequences.                                                                                 |
+| `default_device`       | Default computation device (`cpu` or `gpu`). Default is `cpu`.                                                                                                   |
+| `models_dir`           | Directory containing pre-trained models. Default is the environment variable `MODELS_DIR` or `models`.                                                          |
+| `output_dir`           | Directory to save output files. Default is the environment variable `OUTPUT_DIR` or `output`.                                                                   |
+| `model_device_map`     | Specify device for each model in the format `model_name:device` (e.g., `prot_t5_xl_uniref50:gpu`). Accepted models: `ankh_base`, `ankh_large`, `prot_t5_xl_uniref50`, `esm2_t36_3B_UR50D`, `pegasus`. |
+| `seed`                 | Random seed for reproducibility. Default is `42`.                                                                                                               |
+| `toks_per_batch`       | Maximum tokens per batch to use during embedding generation. Default is `2048`.                                                                                 |
+| `generate_html`        | Include this flag to generate result web pages for each protein as well as an overview page.                                                                    |
+| `keep_embeddings`      | Keep the LLMs raw embeddings in `OUTPUT_EMBEDDINGS` directory after use. By default, the directory is deleted.                                                  |
+| `aligned_fasta`        | Input protein sequences are aligned or not.                                                                                                                     |
+| `serve`                | Start an HTTP server at the end to serve the result pages.                                                                                                      |
+| `host`                 | Hostname to use when serving the result pages. Default is `"localhost"`.                                                                                        |
+| `port`                 | Port to use when serving the result pages. Default is `8000`.                                                                                                   |
 
 
 ### Examples
