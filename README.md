@@ -81,7 +81,7 @@
 Download and extract Pegasus weights in the `models` directory.  
 
    ```bash
-   aria2c -d ~/models https://dsimb.inserm.fr/PEGASUS/models/pegasus_weights.tar.gz && tar -xzvf ~/models/pegasus_weights.tar.gz -C ~/models
+   aria2c -d ./models https://dsimb.inserm.fr/PEGASUS/models/pegasus_weights.tar.gz && tar -xzvf ~/models/pegasus_weights.tar.gz -C ./models
    ```
 
 ### Docker Installation
