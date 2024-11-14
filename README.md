@@ -1,9 +1,25 @@
+# Pegasus: MD-derived protein flexibility prediction
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/dsimb/pegasus.svg)](https://hub.docker.com/r/dsimb/pegasus)
+[![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg)](LICENSE)
+
+**PEGASUS** is a sequence-based predictor of MD-derived information on protein flexibility. It generates embeddings using pre-trained models, predicts residue-wise real values of backbone fluctuation (RMSF), Phi & Psi dihedral angles standard deviation, and average Local Distance Difference Test (Mean LDDT) across the trajectory, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA (optionnaly aligned) file as input and allows users to specify the computation device (CPU or GPU).
 
 <p align="center">
-    <img src="https://github.com/user-attachments/assets/d8c62317-d82a-403a-b5da-7128c69225c7" alt="logo" width="400">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/25644865/181113256-4c2e9740-014f-4d57-91d0-f5beaf7d51d3.png" width="300">
+  <img alt="" src="https://github.com/user-attachments/assets/d8c62317-d82a-403a-b5da-7128c69225c7" width="300">
+</picture>
 </p>
 
-[![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg)](LICENSE)
+
+## Webserver
+
+This is the repository of the standalone version of the corresponding webserver:  
+[dsimb.inserm.fr/PEGASUS](https://dsimb.inserm.fr/PEGASUS)
+
+
+
 
 ## Table of Contents
 
@@ -22,11 +38,6 @@
 - [License](#license)
 - [Citation](#citation)
 - [Contact](#contact)
-
-
-## Introduction
-
-**PEGASUS** is a sequence-based predictor of MD-derived information on protein flexibility. It generates embeddings using pre-trained models, predicts residue-wise real values of backbone fluctuation (RMSF), Phi & Psi dihedral angles standard deviation, and average Local Distance Difference Test (Mean LDDT) across the trajectory, and can optionally generate interactive result web pages for each protein sequence provided. PEGASUS accepts a FASTA (optionnaly aligned) file as input and allows users to specify the computation device (CPU or GPU).
 
 
 ## Features
