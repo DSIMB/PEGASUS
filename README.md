@@ -3,7 +3,7 @@
     <img src="https://github.com/user-attachments/assets/d8c62317-d82a-403a-b5da-7128c69225c7" alt="logo" width="400">
 </p>
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-CC--BY--4.0-blue.svg)](LICENSE)
 
 ## Table of Contents
 
