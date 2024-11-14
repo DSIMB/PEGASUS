@@ -53,7 +53,7 @@
 
 ### Prerequisites
 
-- **Operating System**: Linux or macOS (Windows not officially supported)
+- **Operating System**: Linux (not tested on Windows and macOS not supported)
 - **Python**: Version 3.8 or higher
 - **CUDA**: For GPU support (optional)
 - **Conda**: Package and environment management
