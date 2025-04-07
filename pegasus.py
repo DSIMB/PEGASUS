@@ -338,8 +338,8 @@ def load_model_and_tokenizer(name: str, device, models_dir: str):
         model_path = os.path.join(models_dir, f'{name}.pt')
         tokenizer_path = os.path.join(models_dir, f'{name}_tokenizer.pt')
         if os.path.exists(model_path) and os.path.exists(tokenizer_path):
-            model = torch.load(model_path, map_location=device).eval()
-            tokenizer = torch.load(tokenizer_path, map_location=device)
+            model = torch.load(model_path, map_location=device, weights_only=False).eval()
+            tokenizer = torch.load(tokenizer_path, map_location=device, weights_only=False)
         else:
             if name == 'ankh_base':
                 model, tokenizer = ankh.load_base_model()
@@ -357,8 +357,8 @@ def load_model_and_tokenizer(name: str, device, models_dir: str):
         model_path = os.path.join(models_dir, f'{name}.pt')
         tokenizer_path = os.path.join(models_dir, f'{name}_tokenizer.pt')
         if os.path.exists(model_path) and os.path.exists(tokenizer_path):
-            model = torch.load(model_path)
-            alphabet = torch.load(tokenizer_path)
+            model = torch.load(model_path, weights_only=False)
+            alphabet = torch.load(tokenizer_path, weights_only=False)
             tokenizer = alphabet.get_batch_converter()
             model = model.to(device).eval()
         else:
@@ -717,7 +717,7 @@ def predict_metrics_for_proteins(labels, seqs, aligned_fasta, available_X, avail
                     if not os.path.exists(path):
                         logging.warning(f"Model file '{path}' does not exist. Skipping this model.")
                         continue  # Skip if model file does not exist
-                    states = torch.load(path, map_location=device)['model_state_dict']
+                    states = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
                     model.load_state_dict(states, strict=True)
                     model.to(device)
                     model.eval()
