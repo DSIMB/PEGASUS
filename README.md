@@ -82,7 +82,9 @@ This is the repository of the standalone version of the corresponding webserver:
 Download and extract Pegasus weights in the `models` directory.  
 
    ```bash
-   aria2c -d ./models https://dsimb.inserm.fr/PEGASUS/models/pegasus_weights.tar.gz && tar -xzvf ~/models/pegasus_weights.tar.gz -C ./models
+   mkdir -p ./models
+   aria2c -d ./models https://dsimb.inserm.fr/PEGASUS/models/pegasus_weights.tar.gz
+   tar -xzvf ./models/pegasus_weights.tar.gz -C ./models
    ```
 
 ### 3. Conda Installation (not necessary if using Docker)
