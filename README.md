@@ -19,7 +19,11 @@ This is the repository of the standalone version of the corresponding webserver:
 [dsimb.inserm.fr/PEGASUS](https://dsimb.inserm.fr/PEGASUS)
 
 
+## Citation
 
+Vander Meersche Y, Duval G, Cretin G, Gheeraert A, Gelly JC, Galochkina T.  
+PEGASUS: Prediction of MD-derived protein flexibility from sequence.  
+Protein Science. 2025 Aug;34(8):e70221. doi: <a href="https://doi.org/10.1002/pro.70221" target="_blank">10.1002/pro.70221</a>. PMID: 40671366.
 
 ## Table of Contents
 
@@ -249,12 +253,6 @@ PEGASUS utilizes several pre-trained models for embedding generation:
 ## License
 
 This project is licensed under the terms of the MIT license. See the [LICENSE](LICENSE) file for details.
-
-
-## Citation
-
-Vander Meersche Y, Duval G, Cretin G, Gheeraert A, Gelly JC, Galochkina T. PEGASUS: Prediction of MD-derived protein flexibility from sequence. Protein Sci. 2025 Aug;34(8):e70221. doi: 10.1002/pro.70221. PMID: 40671366.
-
 
 ## Contact
 
