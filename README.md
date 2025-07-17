@@ -253,7 +253,7 @@ This project is licensed under the terms of the MIT license. See the [LICENSE](L
 
 ## Citation
 
-If you use PEGASUS in your research, please cite:
+Vander Meersche Y, Duval G, Cretin G, Gheeraert A, Gelly JC, Galochkina T. PEGASUS: Prediction of MD-derived protein flexibility from sequence. Protein Sci. 2025 Aug;34(8):e70221. doi: 10.1002/pro.70221. PMID: 40671366.
 
 
 ## Contact
